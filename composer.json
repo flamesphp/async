@@ -1,0 +1,11 @@
+{
+  "name": "flamesphp/async",
+  "description": "Flames: Async",
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "license": "MIT",
+  "require": {
+    "php": "^8.3"
+  }
+}
+
