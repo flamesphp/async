@@ -1,4 +1,6 @@
 <?php
+declare(strict_types=1);
+
 
 namespace Flames\Async\Async;
 
@@ -11,15 +13,51 @@ if (C::validAsync())
      */
     trait Auto
     {
-        public static function async(\Closure $delegate): \Flames\Async\Async\Service\Task
+        public static function fork(\Closure $delegate): \Flames\Async\Container
         {
-            echo 'c async';
-            return \Flames\Async\Async\Service::async($delegate);
+            return new \Flames\Async\Container(
+                \Flames\Async\Async\Service::fork($delegate)
+            );
         }
 
-        public static function await(mixed ...$tasks): mixed
+        public static function wait(\Flames\Async\Container ...$containers): mixed
         {
-            return \Flames\Async\Async\Service::await(...$tasks);
+            if (count($containers) === 1) {
+                return \Flames\Async\Async\Service::wait($containers[0]->getInner());
+            }
+            $tasks = array_map(static fn($c) => $c->getInner(), $containers);
+            return \Flames\Async\Async\Service::wait(...$tasks);
+        }
+
+        public static function async(\Closure $fn, bool $parallel = false): \Flames\Async\Container
+        {
+            if ($parallel) {
+                return new \Flames\Async\Container(
+                    \Flames\Async\Async\Service::fork($fn)
+                );
+            }
+            return new \Flames\Async\Container(
+                \Flames\Async\Async\Service::async($fn)
+            );
+        }
+
+        public static function await(\Flames\Async\Container ...$containers): mixed
+        {
+            $results = [];
+            foreach ($containers as $c) {
+                $inner = $c->getInner();
+                if ($inner instanceof \Flames\Async\Async\Promise) {
+                    $results[] = \Flames\Async\Async\Service::await($inner);
+                } else {
+                    $results[] = \Flames\Async\Async\Service::wait($inner);
+                }
+            }
+            return count($results) === 1 ? $results[0] : $results;
+        }
+
+        public static function run(): void
+        {
+            \Flames\Async\Async\Service::run();
         }
     }
 } else {
@@ -28,15 +66,51 @@ if (C::validAsync())
      */
     trait Auto
     {
-        public static function async(\Closure $delegate): \Flames\Async\Service\Task
+        public static function fork(\Closure $delegate): \Flames\Async\Container
         {
-            echo 'php async';
-            return \Flames\Async\Service::async($delegate);
+            return new \Flames\Async\Container(
+                \Flames\Async\Service::fork($delegate)
+            );
         }
 
-        public static function await(mixed ...$tasks): mixed
+        public static function wait(\Flames\Async\Container ...$containers): mixed
         {
-            return \Flames\Async\Service::await(...$tasks);
+            if (count($containers) === 1) {
+                return \Flames\Async\Service::wait($containers[0]->getInner());
+            }
+            $tasks = array_map(static fn($c) => $c->getInner(), $containers);
+            return \Flames\Async\Service::wait(...$tasks);
+        }
+
+        public static function async(\Closure $fn, bool $parallel = false): \Flames\Async\Container
+        {
+            if ($parallel) {
+                return new \Flames\Async\Container(
+                    \Flames\Async\Service::fork($fn)
+                );
+            }
+            return new \Flames\Async\Container(
+                \Flames\Async\Service::async($fn)
+            );
+        }
+
+        public static function await(\Flames\Async\Container ...$containers): mixed
+        {
+            $results = [];
+            foreach ($containers as $c) {
+                $inner = $c->getInner();
+                if ($inner instanceof \Flames\Async\Promise) {
+                    $results[] = \Flames\Async\Service::await($inner);
+                } else {
+                    $results[] = \Flames\Async\Service::wait($inner);
+                }
+            }
+            return count($results) === 1 ? $results[0] : $results;
+        }
+
+        public static function run(): void
+        {
+            \Flames\Async\Service::run();
         }
     }
 }

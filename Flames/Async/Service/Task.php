@@ -55,6 +55,8 @@ final class Task
     private mixed $forkSocket = null;
     private int   $forkPid    = -1;
 
+    private static bool $isChildProcess = false;
+
     // ── Fiber mode state ───────────────────────────────────────────────────
     private ?\Fiber $fiber = null;
 
@@ -77,6 +79,12 @@ final class Task
 
     public function __destruct()
     {
+        // Child processes must never kill or close resources belonging to
+        // sibling tasks that were inherited from the parent via fork.
+        if (self::$isChildProcess) {
+            return;
+        }
+
         if ($this->forkSocket !== null) {
             @fclose($this->forkSocket);
             $this->forkSocket = null;
@@ -182,6 +190,7 @@ final class Task
             /* ================================================================
              * CHILD PROCESS
              * ================================================================ */
+            self::$isChildProcess = true;
             fclose($pair[0]); // child never reads
 
             try {
